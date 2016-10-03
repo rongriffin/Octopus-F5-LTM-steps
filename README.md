@@ -1,4 +1,4 @@
-# Octopus-F5-LTM-steps
+# Octopus F5 LTM steps
 
 Octopus steps useful for blue/green deployments managed by F5's Local Traffic Manager (LTM).
 
@@ -10,4 +10,3 @@ Check if the active server pool for a specified F5 LTM virtual server is Active.
 
 Set the server pool for a F5 LTM virtual server route traffic to a new set of servers.
 
- 
