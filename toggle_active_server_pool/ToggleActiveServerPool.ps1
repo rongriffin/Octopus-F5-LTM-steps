@@ -1,12 +1,14 @@
 ##
 # Print the settings for debugging purposes
 ##
-function Print-DebugVariables($LtmIp, $UserName, $VirtualServer, $ServerPool) {
+function Print-DebugVariables($LtmIp, $UserName, $VirtualServer, $BlueServerPool, $GreenServerPool) {
     Write-Host "Using LTM IP: $LtmIP"
     Write-Host "Using Username: $UserName"
     Write-Host "Using Virtual Server: $VirtualServer"
-    Write-Host "Using New Server Pool: $ServerPool"
+    Write-Host "Using Blue Server Pool: $BlueServerPool"
+    Write-Host "Using Green Server Pool: $GreenServerPool"
 }
+
 
 ##
 # Get the current virtual server pool name
@@ -50,7 +52,7 @@ add-type @"
 "@
 [System.Net.ServicePointManager]::CertificatePolicy = New-Object TrustAllCertsPolicy
 
-Print-DebugVariables $F5BigIP $F5LtmUserName $F5LtmVirtualServer $F5LtmNewServerPool
+Print-DebugVariables $F5BigIP $F5LtmUserName $F5LtmVirtualServer $F5LtmBlueServerPool $F5LtmGreenServerPool
 
 #create F5 Credentials
 $secpasswd = ConvertTo-SecureString $F5LtmUserPassword -AsPlainText -Force
@@ -60,9 +62,15 @@ $cred = New-Object System.Management.Automation.PSCredential ($F5LtmUserName, $s
 $currentPool = Get-CurrentPool -LtmIp $F5BigIP -VirtualServer $F5LtmVirtualServer -Credential $cred
 Write-Host "The current pool is $currentPool"
 
-If($currentPool -Match $F5LtmNewServerPool) {
-    Write-Host "Specified server pool is already active.  Skipping..."
+If($currentPool -Match $F5LtmBlueServerPool) {
+    Write-Host "Blue server pool is active.  Switching to Green"
+    Set-ServerPool -LtmIp $F5LtmBigIP -VirtualServer $F5LtmVirtualServer -Pool $F5LtmGreenServerPool -Credential $cred
+}
+ElseIf($currentPool -Match $F5LtmGreenServerPool) {
+    Write-Host "Green server pool is active.  Switching to Blue"
+    Set-ServerPool -LtmIp $F5LtmBigIP -VirtualServer $F5LtmVirtualServer -Pool $F5LtmBlueServerPool -Credential $cred
 }
 Else {
-    Set-ServerPool -LtmIp $F5LtmBigIP -VirtualServer $F5LtmVirtualServer -Pool $F5LtmNewServerPool -Credential $cred
+    Write-Error "Current pool does not match the configured blue or green pool name.  No changes will be made"
 }
+

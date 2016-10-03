@@ -1,9 +1,9 @@
 {
   "Id": "ActionTemplates-341",
   "Name": "F5 LTM - Verify server pool is not active",
-  "Description": "Query the F5 LTM and make sure that a server pool is not active.  If it is, throw an error to stop a deploy.",
+  "Description": "Query the F5 LTM and make sure that a server pool is not active.  If it is, throw an error to stop a deploy.\n\nhttps://github.com/rongriffin/Octopus-F5-LTM-steps",
   "ActionType": "Octopus.Script",
-  "Version": 0,
+  "Version": 1,
   "Properties": {
     "Octopus.Action.Script.Syntax": "PowerShell",
     "Octopus.Action.Script.ScriptSource": "Inline",
@@ -66,7 +66,7 @@
     }
   ],
   "$Meta": {
-    "ExportedAt": "2016-10-03T19:21:29.021Z",
+    "ExportedAt": "2016-10-03T19:56:33.799Z",
     "OctopusVersion": "3.4.7",
     "Type": "ActionTemplate"
   }
