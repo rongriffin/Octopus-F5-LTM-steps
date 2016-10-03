@@ -10,3 +10,6 @@ Check if the active server pool for a specified F5 LTM virtual server is Active.
 
 Set the server pool for a F5 LTM virtual server route traffic to a new set of servers.
 
+##toggle_active_server_pool
+
+Make the non-active server pool active.
