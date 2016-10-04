@@ -32,7 +32,7 @@ function Set-ServerPool($LtmIp, $VirtualServer, $Pool, $Credential) {
 
 
     $body = $request | ConvertTo-Json
-    Invoke-RestMethod -Uri $uri -Credential $Credendial -Method Patch -Body $body -ContentType 'application/json'
+    Invoke-RestMethod -Uri $uri -Credential $Credential -Method Patch -Body $body -ContentType 'application/json'
 }
 
 
