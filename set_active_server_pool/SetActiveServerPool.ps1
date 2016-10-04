@@ -57,7 +57,7 @@ $secpasswd = ConvertTo-SecureString $F5LtmUserPassword -AsPlainText -Force
 $cred = New-Object System.Management.Automation.PSCredential ($F5LtmUserName, $secpasswd)
 
 # Check the current server pool
-$currentPool = Get-CurrentPool -LtmIp $F5BigIP -VirtualServer $F5LtmVirtualServer -Credential $cred
+$currentPool = Get-CurrentPool -LtmIp $F5LtmBigIP -VirtualServer $F5LtmVirtualServer -Credential $cred
 Write-Host "The current pool is $currentPool"
 
 If($currentPool -Match $F5LtmNewServerPool) {
