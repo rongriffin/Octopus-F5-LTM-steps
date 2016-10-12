@@ -20,6 +20,33 @@ function Get-CurrentPool($LtmIp, $VirtualServer, $Credential) {
 }
 
 ##
+# Some LTM devices can be paired for failover.  Query a known device to
+# select the active device in the group.
+##
+function Get-ActiveLtmDevice($LtmIp, $Credential) {
+    $uri = "https://$LtmIp/mgmt/tm/cm/device"
+
+    Write-Host "Requesting device config from $uri"
+    $response = Invoke-RestMethod -Uri $uri -Credential $Credential -Method Get 
+
+    $active = $null
+    foreach ($item in $response.Items) {
+        if ($item.failoverState -eq "active") {
+            $active = $item.name
+            Write-Host "$active is an active node"
+        }
+        else {
+            Write-Host $item.fullPath " is not active" 
+        }
+    }
+    if ($active -eq $null) {
+        Write-Error "No active device found."
+    }
+
+    return $active
+}
+
+##
 # Set a virtual server's pool name
 ##
 function Set-ServerPool($LtmIp, $VirtualServer, $Pool, $Credential) {
@@ -29,7 +56,6 @@ function Set-ServerPool($LtmIp, $VirtualServer, $Pool, $Credential) {
     $request = @{
         pool="$Pool"
     }
-
 
     $body = $request | ConvertTo-Json
     Invoke-RestMethod -Uri $uri -Credential $Credential -Method Patch -Body $body -ContentType 'application/json'
@@ -56,13 +82,16 @@ Print-DebugVariables $F5BigIP $F5LtmUserName $F5LtmVirtualServer $F5LtmNewServer
 $secpasswd = ConvertTo-SecureString $F5LtmUserPassword -AsPlainText -Force
 $cred = New-Object System.Management.Automation.PSCredential ($F5LtmUserName, $secpasswd)
 
+#select the active device
+$activeLtmBigIp = Get-ActiveLtmDevice -LtmIp $F5LtmBigIP -Credential $cred
+
 # Check the current server pool
-$currentPool = Get-CurrentPool -LtmIp $F5LtmBigIP -VirtualServer $F5LtmVirtualServer -Credential $cred
+$currentPool = Get-CurrentPool -LtmIp $activeLtmBigIp -VirtualServer $F5LtmVirtualServer -Credential $cred
 Write-Host "The current pool is $currentPool"
 
 If($currentPool -Match $F5LtmNewServerPool) {
     Write-Host "Specified server pool is already active.  Skipping..."
 }
 Else {
-    Set-ServerPool -LtmIp $F5LtmBigIP -VirtualServer $F5LtmVirtualServer -Pool $F5LtmNewServerPool -Credential $cred
+    Set-ServerPool -LtmIp $activeLtmBigIp -VirtualServer $F5LtmVirtualServer -Pool $F5LtmNewServerPool -Credential $cred
 }

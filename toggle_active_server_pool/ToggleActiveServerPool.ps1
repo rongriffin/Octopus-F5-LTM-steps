@@ -9,6 +9,32 @@ function Print-DebugVariables($LtmIp, $UserName, $VirtualServer, $BlueServerPool
     Write-Host "Using Green Server Pool: $GreenServerPool"
 }
 
+##
+# Some LTM devices can be paired for failover.  Query a known device to
+# select the active device in the group.
+##
+function Get-ActiveLtmDevice($LtmIp, $Credential) {
+    $uri = "https://$LtmIp/mgmt/tm/cm/device"
+
+    Write-Host "Requesting device config from $uri"
+    $response = Invoke-RestMethod -Uri $uri -Credential $Credential -Method Get 
+
+    $active = $null
+    foreach ($item in $response.Items) {
+        if ($item.failoverState -eq "active") {
+            $active = $item.name
+            Write-Host "$active is an active node"
+        }
+        else {
+            Write-Host $item.fullPath " is not active" 
+        }
+    }
+    if ($active -eq $null) {
+        Write-Error "No active device found."
+    }
+
+    return $active
+}
 
 ##
 # Get the current virtual server pool name
@@ -58,17 +84,20 @@ Print-DebugVariables $F5BigIP $F5LtmUserName $F5LtmVirtualServer $F5LtmBlueServe
 $secpasswd = ConvertTo-SecureString $F5LtmUserPassword -AsPlainText -Force
 $cred = New-Object System.Management.Automation.PSCredential ($F5LtmUserName, $secpasswd)
 
+#select the active device
+$activeLtmBigIp = Get-ActiveLtmDevice -LtmIp $F5LtmBigIP -Credential $cred
+
 # Check the current server pool
-$currentPool = Get-CurrentPool -LtmIp $F5LtmBigIP -VirtualServer $F5LtmVirtualServer -Credential $cred
+$currentPool = Get-CurrentPool -LtmIp $activeLtmBigIp -VirtualServer $F5LtmVirtualServer -Credential $cred
 Write-Host "The current pool is $currentPool"
 
 If($currentPool -Match $F5LtmBlueServerPool) {
     Write-Host "Blue server pool is active.  Switching to Green"
-    Set-ServerPool -LtmIp $F5LtmBigIP -VirtualServer $F5LtmVirtualServer -Pool $F5LtmGreenServerPool -Credential $cred
+    Set-ServerPool -LtmIp $activeLtmBigIp -VirtualServer $F5LtmVirtualServer -Pool $F5LtmGreenServerPool -Credential $cred
 }
 ElseIf($currentPool -Match $F5LtmGreenServerPool) {
     Write-Host "Green server pool is active.  Switching to Blue"
-    Set-ServerPool -LtmIp $F5LtmBigIP -VirtualServer $F5LtmVirtualServer -Pool $F5LtmBlueServerPool -Credential $cred
+    Set-ServerPool -LtmIp $activeLtmBigIp -VirtualServer $F5LtmVirtualServer -Pool $F5LtmBlueServerPool -Credential $cred
 }
 Else {
     Write-Error "Current pool does not match the configured blue or green pool name.  No changes will be made"

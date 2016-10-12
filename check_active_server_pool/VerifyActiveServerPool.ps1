@@ -19,6 +19,33 @@ function Get-CurrentPool($LtmIp, $VirtualServer, $Credential) {
     return $response.pool
 }
 
+##
+# Some LTM devices can be paired for failover.  Query a known device to
+# select the active device in the group.
+##
+function Get-ActiveLtmDevice($LtmIp, $Credential) {
+    $uri = "https://$LtmIp/mgmt/tm/cm/device"
+
+    Write-Host "Requesting device config from $uri"
+    $response = Invoke-RestMethod -Uri $uri -Credential $Credential -Method Get 
+
+    $active = $null
+    foreach ($item in $response.Items) {
+        if ($item.failoverState -eq "active") {
+            $active = $item.name
+            Write-Host "$active is an active node"
+        }
+        else {
+            Write-Host $item.fullPath " is not active" 
+        }
+    }
+    if ($active -eq $null) {
+        Write-Error "No active device found."
+    }
+
+    return $active
+}
+
 # Handle untrusted certs since we use self-signed certificates.
 add-type @"
     using System.Net;
@@ -39,11 +66,14 @@ Print-DebugVariables $F5BigIP $F5LtmUserName $F5LtmVirtualServer $F5LtmServerPoo
 $secpasswd = ConvertTo-SecureString $F5LtmUserPassword -AsPlainText -Force
 $cred = New-Object System.Management.Automation.PSCredential ($F5LtmUserName, $secpasswd)
 
+#select the active device
+$activeLtmBigIp = Get-ActiveLtmDevice -LtmIp $F5BigIP -Credential $cred
+
 # Check the current server pool
-$currentPool = Get-CurrentPool -LtmIp $F5BigIP -VirtualServer $F5LtmVirtualServer -Credential $cred
+$currentPool = Get-CurrentPool -LtmIp $activeLtmBigIp -VirtualServer $F5LtmVirtualServer -Credential $cred
 Write-Host "The current pool is $currentPool"
 
-If($currentPool -Match $F5LtmServerPool) {
+If ($currentPool -Match $F5LtmServerPool) {
     Write-Error "The live server pool is already set to $F5LtmServerPool.  Try deploying to a non-active environment."
 }
 Else {
