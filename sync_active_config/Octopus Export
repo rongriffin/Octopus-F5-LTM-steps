@@ -1,0 +1,63 @@
+{
+  "Id": "ActionTemplates-346",
+  "Name": "F5 LTM - Sync Device Config",
+  "Description": "Sync the active LTM device changes to the failover device group.\n\nhttps://github.com/rongriffin/Octopus-F5-LTM-steps",
+  "ActionType": "Octopus.Script",
+  "Version": 1,
+  "Properties": {
+    "Octopus.Action.Script.Syntax": "PowerShell",
+    "Octopus.Action.Script.ScriptSource": "Inline",
+    "Octopus.Action.RunOnServer": "false",
+    "Octopus.Action.Script.ScriptBody": "##\r\n# Print the settings for debugging purposes\r\n##\r\nfunction Print-DebugVariables($LtmIp, $UserName, $LtmDeviceGroup) {\r\n    Write-Host \"Using LTM Big IP address: $LtmIP\"\r\n    Write-Host \"Using Username: $UserName\"  \r\n    Write-Host \"Using LTM Device Group: $LtmDeviceGroup\"       \r\n}\r\n\r\n##\r\n# Some LTM devices can be paired for failover.  Query a known device to\r\n# select the active device in the group.\r\n##\r\nfunction Get-ActiveLtmDevice($LtmIp, $Credential) {\r\n    $uri = \"https://$LtmIp/mgmt/tm/cm/device\"\r\n\r\n    Write-Host \"Requesting device config from $uri\"\r\n    $response = Invoke-RestMethod -Uri $uri -Credential $Credential -Method Get \r\n\r\n    $active = $null\r\n    foreach ($item in $response.Items) {\r\n        if ($item.failoverState -eq \"active\") {\r\n            $active = $item.name\r\n            Write-Host \"$active is an active node\"\r\n        }\r\n        else {\r\n            Write-Host $item.fullPath \" is not active\" \r\n        }\r\n    }\r\n    if ($active -eq $null) {\r\n        Write-Error \"No active device found.\"\r\n    }\r\n\r\n    return $active\r\n}\r\n\r\n##\r\n# Sync config changes from a device to the device group\r\n##\r\nfunction Sync-LtmGroup($LtmIp, $LtmDeviceGroup, $Credential) {\r\n    $uri = \"https://$LtmIp/mgmt/tm/cm\"\r\n\r\n    Write-Host \"syncing device config at $uri\"\r\n\r\n    $request = @{\r\n        command=\"run\"\r\n        utilCmdArgs=\"config-sync to-group $LtmDeviceGroup\"\r\n    }\r\n\r\n    $body = $request | ConvertTo-Json\r\n    $response = Invoke-RestMethod -Uri $uri -Credential $Credential -Method Post -Body $body -ContentType 'application/json'\r\n\r\n    write-host $response\r\n}\r\n\r\n# Handle untrusted certs since we use self-signed certificates.\r\nadd-type @\"\r\n    using System.Net;\r\n    using System.Security.Cryptography.X509Certificates;\r\n    public class TrustAllCertsPolicy : ICertificatePolicy {\r\n        public bool CheckValidationResult(\r\n            ServicePoint srvPoint, X509Certificate certificate,\r\n            WebRequest request, int certificateProblem) {\r\n            return true;\r\n        }\r\n    }\r\n\"@\r\n[System.Net.ServicePointManager]::CertificatePolicy = New-Object TrustAllCertsPolicy\r\n\r\nPrint-DebugVariables $F5LtmBigIP $F5LtmUserName $F5LtmDeviceGroup\r\n\r\n#create F5 Credentials\r\n$secpasswd = ConvertTo-SecureString $F5LtmUserPassword -AsPlainText -Force\r\n$cred = New-Object System.Management.Automation.PSCredential ($F5LtmUserName, $secpasswd)\r\n\r\n#select the active device\r\n$activeLtmBigIp = Get-ActiveLtmDevice -LtmIp $F5LtmBigIP -Credential $cred\r\n\r\n#sync the active device to the device group\r\nSync-LtmGroup $activeLtmBigIp $F5LtmDeviceGroup $cred",
+    "Octopus.Action.Script.ScriptFileName": null,
+    "Octopus.Action.Package.FeedId": null,
+    "Octopus.Action.Package.PackageId": null
+  },
+  "Parameters": [
+    {
+      "Id": "34ee56bb-79f5-42b4-a260-330cdf25bec1",
+      "Name": "F5LtmBigIP",
+      "Label": "F5 Ltm Big IP",
+      "HelpText": "The address of the F5 LTM Big IP device",
+      "DefaultValue": null,
+      "DisplaySettings": {
+        "Octopus.ControlType": "SingleLineText"
+      }
+    },
+    {
+      "Id": "021c120d-01e8-4f98-a78f-72340d3c5bc4",
+      "Name": "F5LtmUserName",
+      "Label": "F5 Ltm User Name",
+      "HelpText": "The login name of a user with access to the API",
+      "DefaultValue": null,
+      "DisplaySettings": {
+        "Octopus.ControlType": "SingleLineText"
+      }
+    },
+    {
+      "Id": "c9921180-4a7a-49a3-a8bc-c87be7c84d07",
+      "Name": "F5LtmUserPassword",
+      "Label": "F5 LTM User Password",
+      "HelpText": "The password of a user with access to the API.",
+      "DefaultValue": null,
+      "DisplaySettings": {
+        "Octopus.ControlType": "SingleLineText"
+      }
+    },
+    {
+      "Id": "e9a8ab06-0812-4ffe-ab3a-85e001c3882f",
+      "Name": "F5LtmDeviceGroup",
+      "Label": "F5 Ltm Device Group",
+      "HelpText": "The name of the failover device group that we should sync configuration to.",
+      "DefaultValue": null,
+      "DisplaySettings": {
+        "Octopus.ControlType": "SingleLineText"
+      }
+    }
+  ],
+  "$Meta": {
+    "ExportedAt": "2016-10-20T15:15:33.051Z",
+    "OctopusVersion": "3.4.7",
+    "Type": "ActionTemplate"
+  }
+}

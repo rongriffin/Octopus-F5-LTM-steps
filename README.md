@@ -13,3 +13,7 @@ Set the server pool for a F5 LTM virtual server route traffic to a new set of se
 ##toggle_active_server_pool
 
 Make the non-active server pool active.
+
+##sync_active_config
+
+Select the active device and sync its config to the specified device group.
