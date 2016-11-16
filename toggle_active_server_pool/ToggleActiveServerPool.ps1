@@ -78,28 +78,27 @@ add-type @"
 "@
 [System.Net.ServicePointManager]::CertificatePolicy = New-Object TrustAllCertsPolicy
 
-Print-DebugVariables $F5BigIP $F5LtmUserName $F5LtmVirtualServer $F5LtmBlueServerPool $F5LtmGreenServerPool
+Print-DebugVariables $stepF5LtmBigIP $stepF5LtmUserName $stepF5LtmVirtualServer $stepF5LtmBlueServerPool $stepF5LtmGreenServerPool
 
 #create F5 Credentials
-$secpasswd = ConvertTo-SecureString $F5LtmUserPassword -AsPlainText -Force
-$cred = New-Object System.Management.Automation.PSCredential ($F5LtmUserName, $secpasswd)
+$secpasswd = ConvertTo-SecureString $stepF5LtmUserPassword -AsPlainText -Force
+$cred = New-Object System.Management.Automation.PSCredential ($stepF5LtmUserName, $secpasswd)
 
 #select the active device
-$activeLtmBigIp = Get-ActiveLtmDevice -LtmIp $F5LtmBigIP -Credential $cred
+$activeLtmBigIp = Get-ActiveLtmDevice -LtmIp $stepF5LtmBigIP -Credential $cred
 
 # Check the current server pool
-$currentPool = Get-CurrentPool -LtmIp $activeLtmBigIp -VirtualServer $F5LtmVirtualServer -Credential $cred
+$currentPool = Get-CurrentPool -LtmIp $activeLtmBigIp -VirtualServer $stepF5LtmVirtualServer -Credential $cred
 Write-Host "The current pool is $currentPool"
 
-If($currentPool -Match $F5LtmBlueServerPool) {
+If($currentPool -Match $stepF5LtmBlueServerPool) {
     Write-Host "Blue server pool is active.  Switching to Green"
-    Set-ServerPool -LtmIp $activeLtmBigIp -VirtualServer $F5LtmVirtualServer -Pool $F5LtmGreenServerPool -Credential $cred
+    Set-ServerPool -LtmIp $activeLtmBigIp -VirtualServer $stepF5LtmVirtualServer -Pool $stepF5LtmGreenServerPool -Credential $cred
 }
-ElseIf($currentPool -Match $F5LtmGreenServerPool) {
+ElseIf($currentPool -Match $stepF5LtmGreenServerPool) {
     Write-Host "Green server pool is active.  Switching to Blue"
-    Set-ServerPool -LtmIp $activeLtmBigIp -VirtualServer $F5LtmVirtualServer -Pool $F5LtmBlueServerPool -Credential $cred
+    Set-ServerPool -LtmIp $activeLtmBigIp -VirtualServer $stepF5LtmVirtualServer -Pool $stepF5LtmBlueServerPool -Credential $cred
 }
 Else {
     Write-Error "Current pool does not match the configured blue or green pool name.  No changes will be made"
 }
-

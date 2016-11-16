@@ -3,12 +3,12 @@
   "Name": "F5 LTM - Set active server pool",
   "Description": "Set a F5 LTM virtual server's server pool property to make a server pool live.\n\nhttps://github.com/rongriffin/Octopus-F5-LTM-steps",
   "ActionType": "Octopus.Script",
-  "Version": 6,
+  "Version": 7,
   "Properties": {
     "Octopus.Action.Script.Syntax": "PowerShell",
     "Octopus.Action.Script.ScriptSource": "Inline",
     "Octopus.Action.RunOnServer": "false",
-    "Octopus.Action.Script.ScriptBody": "##\r\n# Print the settings for debugging purposes\r\n##\r\nfunction Print-DebugVariables($LtmIp, $UserName, $VirtualServer, $ServerPool) {\r\n    Write-Host \"Using LTM IP: $LtmIP\"\r\n    Write-Host \"Using Username: $UserName\"\r\n    Write-Host \"Using Virtual Server: $VirtualServer\"\r\n    Write-Host \"Using New Server Pool: $ServerPool\"\r\n}\r\n\r\n##\r\n# Get the current virtual server pool name\r\n##\r\nfunction Get-CurrentPool($LtmIp, $VirtualServer, $Credential) {\r\n    $uri = \"https://$LtmIp/mgmt/tm/ltm/virtual/$VirtualServer\"\r\n    Write-Host \"Requesting current server pool from $uri\"\r\n    $response = Invoke-RestMethod -Uri $uri -Credential $Credential -Method Get \r\n\r\n    return $response.pool\r\n}\r\n\r\n##\r\n# Some LTM devices can be paired for failover.  Query a known device to\r\n# select the active device in the group.\r\n##\r\nfunction Get-ActiveLtmDevice($LtmIp, $Credential) {\r\n    $uri = \"https://$LtmIp/mgmt/tm/cm/device\"\r\n\r\n    Write-Host \"Requesting device config from $uri\"\r\n    $response = Invoke-RestMethod -Uri $uri -Credential $Credential -Method Get \r\n\r\n    $active = $null\r\n    foreach ($item in $response.Items) {\r\n        if ($item.failoverState -eq \"active\") {\r\n            $active = $item.name\r\n            Write-Host \"$active is an active node\"\r\n        }\r\n        else {\r\n            Write-Host $item.fullPath \" is not active\" \r\n        }\r\n    }\r\n    if ($active -eq $null) {\r\n        Write-Error \"No active device found.\"\r\n    }\r\n\r\n    return $active\r\n}\r\n\r\n##\r\n# Set a virtual server's pool name\r\n##\r\nfunction Set-ServerPool($LtmIp, $VirtualServer, $Pool, $Credential) {\r\n    $uri = \"https://$LtmIp/mgmt/tm/ltm/virtual/$VirtualServer\"\r\n    Write-Host \"Setting server pool $Pool at $uri\"\r\n\r\n    $request = @{\r\n        pool=\"$Pool\"\r\n    }\r\n\r\n    $body = $request | ConvertTo-Json\r\n    Invoke-RestMethod -Uri $uri -Credential $Credential -Method Patch -Body $body -ContentType 'application/json'\r\n}\r\n\r\n\r\n# Handle untrusted certs since we use self-signed certificates.\r\nadd-type @\"\r\n    using System.Net;\r\n    using System.Security.Cryptography.X509Certificates;\r\n    public class TrustAllCertsPolicy : ICertificatePolicy {\r\n        public bool CheckValidationResult(\r\n            ServicePoint srvPoint, X509Certificate certificate,\r\n            WebRequest request, int certificateProblem) {\r\n            return true;\r\n        }\r\n    }\r\n\"@\r\n[System.Net.ServicePointManager]::CertificatePolicy = New-Object TrustAllCertsPolicy\r\n\r\nPrint-DebugVariables $F5BigIP $F5LtmUserName $F5LtmVirtualServer $F5LtmNewServerPool\r\n\r\n#create F5 Credentials\r\n$secpasswd = ConvertTo-SecureString $F5LtmUserPassword -AsPlainText -Force\r\n$cred = New-Object System.Management.Automation.PSCredential ($F5LtmUserName, $secpasswd)\r\n\r\n#select the active device\r\n$activeLtmBigIp = Get-ActiveLtmDevice -LtmIp $F5LtmBigIP -Credential $cred\r\n\r\n# Check the current server pool\r\n$currentPool = Get-CurrentPool -LtmIp $activeLtmBigIp -VirtualServer $F5LtmVirtualServer -Credential $cred\r\nWrite-Host \"The current pool is $currentPool\"\r\n\r\nIf($currentPool -Match $F5LtmNewServerPool) {\r\n    Write-Host \"Specified server pool is already active.  Skipping...\"\r\n}\r\nElse {\r\n    Set-ServerPool -LtmIp $activeLtmBigIp -VirtualServer $F5LtmVirtualServer -Pool $F5LtmNewServerPool -Credential $cred\r\n}\r\n",
+    "Octopus.Action.Script.ScriptBody": "##\r\n# Print the settings for debugging purposes\r\n##\r\nfunction Print-DebugVariables($LtmIp, $UserName, $VirtualServer, $ServerPool) {\r\n    Write-Host \"Using LTM IP: $LtmIP\"\r\n    Write-Host \"Using Username: $UserName\"\r\n    Write-Host \"Using Virtual Server: $VirtualServer\"\r\n    Write-Host \"Using New Server Pool: $ServerPool\"\r\n}\r\n\r\n##\r\n# Get the current virtual server pool name\r\n##\r\nfunction Get-CurrentPool($LtmIp, $VirtualServer, $Credential) {\r\n    $uri = \"https://$LtmIp/mgmt/tm/ltm/virtual/$VirtualServer\"\r\n    Write-Host \"Requesting current server pool from $uri\"\r\n    $response = Invoke-RestMethod -Uri $uri -Credential $Credential -Method Get \r\n\r\n    return $response.pool\r\n}\r\n\r\n##\r\n# Some LTM devices can be paired for failover.  Query a known device to\r\n# select the active device in the group.\r\n##\r\nfunction Get-ActiveLtmDevice($LtmIp, $Credential) {\r\n    $uri = \"https://$LtmIp/mgmt/tm/cm/device\"\r\n\r\n    Write-Host \"Requesting device config from $uri\"\r\n    $response = Invoke-RestMethod -Uri $uri -Credential $Credential -Method Get \r\n\r\n    $active = $null\r\n    foreach ($item in $response.Items) {\r\n        if ($item.failoverState -eq \"active\") {\r\n            $active = $item.name\r\n            Write-Host \"$active is an active node\"\r\n        }\r\n        else {\r\n            Write-Host $item.fullPath \" is not active\" \r\n        }\r\n    }\r\n    if ($active -eq $null) {\r\n        Write-Error \"No active device found.\"\r\n    }\r\n\r\n    return $active\r\n}\r\n\r\n##\r\n# Set a virtual server's pool name\r\n##\r\nfunction Set-ServerPool($LtmIp, $VirtualServer, $Pool, $Credential) {\r\n    $uri = \"https://$LtmIp/mgmt/tm/ltm/virtual/$VirtualServer\"\r\n    Write-Host \"Setting server pool $Pool at $uri\"\r\n\r\n    $request = @{\r\n        pool=\"$Pool\"\r\n    }\r\n\r\n    $body = $request | ConvertTo-Json\r\n    Invoke-RestMethod -Uri $uri -Credential $Credential -Method Patch -Body $body -ContentType 'application/json'\r\n}\r\n\r\n\r\n# Handle untrusted certs since we use self-signed certificates.\r\nadd-type @\"\r\n    using System.Net;\r\n    using System.Security.Cryptography.X509Certificates;\r\n    public class TrustAllCertsPolicy : ICertificatePolicy {\r\n        public bool CheckValidationResult(\r\n            ServicePoint srvPoint, X509Certificate certificate,\r\n            WebRequest request, int certificateProblem) {\r\n            return true;\r\n        }\r\n    }\r\n\"@\r\n[System.Net.ServicePointManager]::CertificatePolicy = New-Object TrustAllCertsPolicy\r\n\r\nPrint-DebugVariables $stepF5LtmBigIP $stepF5LtmUserName $stepF5LtmVirtualServer $stepF5LtmNewServerPool\r\n\r\n#create F5 Credentials\r\n$secpasswd = ConvertTo-SecureString $stepF5LtmUserPassword -AsPlainText -Force\r\n$cred = New-Object System.Management.Automation.PSCredential ($stepF5LtmUserName, $secpasswd)\r\n\r\n#select the active device\r\n$activeLtmBigIp = Get-ActiveLtmDevice -LtmIp $stepF5LtmBigIP -Credential $cred\r\n\r\n# Check the current server pool\r\n$currentPool = Get-CurrentPool -LtmIp $activeLtmBigIp -VirtualServer $stepF5LtmVirtualServer -Credential $cred\r\nWrite-Host \"The current pool is $currentPool\"\r\n\r\nIf($currentPool -Match $stepF5LtmNewServerPool) {\r\n    Write-Host \"Specified server pool is already active.  Skipping...\"\r\n}\r\nElse {\r\n    Set-ServerPool -LtmIp $activeLtmBigIp -VirtualServer $stepF5LtmVirtualServer -Pool $stepF5LtmNewServerPool -Credential $cred\r\n}",
     "Octopus.Action.Script.ScriptFileName": null,
     "Octopus.Action.Package.FeedId": null,
     "Octopus.Action.Package.PackageId": null
@@ -16,7 +16,7 @@
   "Parameters": [
     {
       "Id": "861f4487-c794-42f4-ba43-ead96d636dad",
-      "Name": "F5LtmBigIP",
+      "Name": "stepF5LtmBigIP",
       "Label": "F5 LTM Big IP",
       "HelpText": "The IP address of the F5 BIG-IP device",
       "DefaultValue": null,
@@ -26,9 +26,9 @@
     },
     {
       "Id": "893f31a8-a3c7-4014-9985-7c9b12f170e6",
-      "Name": "F5LtmUserName",
+      "Name": "stepF5LtmUserName",
       "Label": "F5 LTM User Name",
-      "HelpText": "The name of a F5 LTM user who has access to the API",
+      "HelpText": "The username of a F5 LTM user who has access to the API",
       "DefaultValue": null,
       "DisplaySettings": {
         "Octopus.ControlType": "SingleLineText"
@@ -36,9 +36,9 @@
     },
     {
       "Id": "ceedb8f3-8e88-45b1-b19e-eb474b0ab8ec",
-      "Name": "F5LtmUserPassword",
+      "Name": "stepF5LtmUserPassword",
       "Label": "F5 LTM User Password",
-      "HelpText": "The password for F5 LTM user who has access to the API",
+      "HelpText": "The password for the F5 LTM user who has access to the API",
       "DefaultValue": null,
       "DisplaySettings": {
         "Octopus.ControlType": "SingleLineText"
@@ -46,7 +46,7 @@
     },
     {
       "Id": "e13df520-8aca-47d5-8f39-3e9682565ea6",
-      "Name": "F5LtmVirtualServer",
+      "Name": "stepF5LtmVirtualServer",
       "Label": "F5 LTM Virtual Server Name",
       "HelpText": "The name of the F5 LTM virtual server whose server pool property we're setting.",
       "DefaultValue": null,
@@ -56,9 +56,9 @@
     },
     {
       "Id": "d3ed2eae-77c9-45c5-8937-490cc7a479ec",
-      "Name": "F5LtmNewServerPool",
+      "Name": "stepF5LtmNewServerPool",
       "Label": "F5 LTM New Server Pool Name",
-      "HelpText": "The name of the server pool we want the specified virtual server to start using.",
+      "HelpText": "The name of the server pool we want the specified virtual server to start using",
       "DefaultValue": null,
       "DisplaySettings": {
         "Octopus.ControlType": "SingleLineText"
@@ -66,8 +66,8 @@
     }
   ],
   "$Meta": {
-    "ExportedAt": "2016-10-12T14:17:00.796Z",
-    "OctopusVersion": "3.4.7",
+    "ExportedAt": "2016-11-16T21:33:37.744Z",
+    "OctopusVersion": "3.4.14",
     "Type": "ActionTemplate"
   }
 }

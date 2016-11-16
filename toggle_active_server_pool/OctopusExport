@@ -3,12 +3,12 @@
   "Name": "F5 LTM - Toggle blue/green server pool",
   "Description": "Toggle between active and non-active blue/green server pools on the F5 LTM load balancer.  \n\nhttps://github.com/rongriffin/Octopus-F5-LTM-steps",
   "ActionType": "Octopus.Script",
-  "Version": 5,
+  "Version": 6,
   "Properties": {
     "Octopus.Action.Script.Syntax": "PowerShell",
     "Octopus.Action.Script.ScriptSource": "Inline",
     "Octopus.Action.RunOnServer": "false",
-    "Octopus.Action.Script.ScriptBody": "##\r\n# Print the settings for debugging purposes\r\n##\r\nfunction Print-DebugVariables($LtmIp, $UserName, $VirtualServer, $BlueServerPool, $GreenServerPool) {\r\n    Write-Host \"Using LTM IP: $LtmIP\"\r\n    Write-Host \"Using Username: $UserName\"\r\n    Write-Host \"Using Virtual Server: $VirtualServer\"\r\n    Write-Host \"Using Blue Server Pool: $BlueServerPool\"\r\n    Write-Host \"Using Green Server Pool: $GreenServerPool\"\r\n}\r\n\r\n##\r\n# Some LTM devices can be paired for failover.  Query a known device to\r\n# select the active device in the group.\r\n##\r\nfunction Get-ActiveLtmDevice($LtmIp, $Credential) {\r\n    $uri = \"https://$LtmIp/mgmt/tm/cm/device\"\r\n\r\n    Write-Host \"Requesting device config from $uri\"\r\n    $response = Invoke-RestMethod -Uri $uri -Credential $Credential -Method Get \r\n\r\n    $active = $null\r\n    foreach ($item in $response.Items) {\r\n        if ($item.failoverState -eq \"active\") {\r\n            $active = $item.name\r\n            Write-Host \"$active is an active node\"\r\n        }\r\n        else {\r\n            Write-Host $item.fullPath \" is not active\" \r\n        }\r\n    }\r\n    if ($active -eq $null) {\r\n        Write-Error \"No active device found.\"\r\n    }\r\n\r\n    return $active\r\n}\r\n\r\n##\r\n# Get the current virtual server pool name\r\n##\r\nfunction Get-CurrentPool($LtmIp, $VirtualServer, $Credential) {\r\n    $uri = \"https://$LtmIp/mgmt/tm/ltm/virtual/$VirtualServer\"\r\n    Write-Host \"Requesting current server pool from $uri\"\r\n    $response = Invoke-RestMethod -Uri $uri -Credential $Credential -Method Get \r\n\r\n    return $response.pool\r\n}\r\n\r\n##\r\n# Set a virtual server's pool name\r\n##\r\nfunction Set-ServerPool($LtmIp, $VirtualServer, $Pool, $Credential) {\r\n    $uri = \"https://$LtmIp/mgmt/tm/ltm/virtual/$VirtualServer\"\r\n    Write-Host \"Setting server pool $Pool at $uri\"\r\n\r\n    $request = @{\r\n        pool=\"$Pool\"\r\n    }\r\n\r\n\r\n    $body = $request | ConvertTo-Json\r\n    Invoke-RestMethod -Uri $uri -Credential $Credential -Method Patch -Body $body -ContentType 'application/json'\r\n}\r\n\r\n\r\n# Handle untrusted certs since we use self-signed certificates.\r\nadd-type @\"\r\n    using System.Net;\r\n    using System.Security.Cryptography.X509Certificates;\r\n    public class TrustAllCertsPolicy : ICertificatePolicy {\r\n        public bool CheckValidationResult(\r\n            ServicePoint srvPoint, X509Certificate certificate,\r\n            WebRequest request, int certificateProblem) {\r\n            return true;\r\n        }\r\n    }\r\n\"@\r\n[System.Net.ServicePointManager]::CertificatePolicy = New-Object TrustAllCertsPolicy\r\n\r\nPrint-DebugVariables $F5BigIP $F5LtmUserName $F5LtmVirtualServer $F5LtmBlueServerPool $F5LtmGreenServerPool\r\n\r\n#create F5 Credentials\r\n$secpasswd = ConvertTo-SecureString $F5LtmUserPassword -AsPlainText -Force\r\n$cred = New-Object System.Management.Automation.PSCredential ($F5LtmUserName, $secpasswd)\r\n\r\n#select the active device\r\n$activeLtmBigIp = Get-ActiveLtmDevice -LtmIp $F5LtmBigIP -Credential $cred\r\n\r\n# Check the current server pool\r\n$currentPool = Get-CurrentPool -LtmIp $activeLtmBigIp -VirtualServer $F5LtmVirtualServer -Credential $cred\r\nWrite-Host \"The current pool is $currentPool\"\r\n\r\nIf($currentPool -Match $F5LtmBlueServerPool) {\r\n    Write-Host \"Blue server pool is active.  Switching to Green\"\r\n    Set-ServerPool -LtmIp $activeLtmBigIp -VirtualServer $F5LtmVirtualServer -Pool $F5LtmGreenServerPool -Credential $cred\r\n}\r\nElseIf($currentPool -Match $F5LtmGreenServerPool) {\r\n    Write-Host \"Green server pool is active.  Switching to Blue\"\r\n    Set-ServerPool -LtmIp $activeLtmBigIp -VirtualServer $F5LtmVirtualServer -Pool $F5LtmBlueServerPool -Credential $cred\r\n}\r\nElse {\r\n    Write-Error \"Current pool does not match the configured blue or green pool name.  No changes will be made\"\r\n}\r\n\r\n",
+    "Octopus.Action.Script.ScriptBody": "##\r\n# Print the settings for debugging purposes\r\n##\r\nfunction Print-DebugVariables($LtmIp, $UserName, $VirtualServer, $BlueServerPool, $GreenServerPool) {\r\n    Write-Host \"Using LTM IP: $LtmIP\"\r\n    Write-Host \"Using Username: $UserName\"\r\n    Write-Host \"Using Virtual Server: $VirtualServer\"\r\n    Write-Host \"Using Blue Server Pool: $BlueServerPool\"\r\n    Write-Host \"Using Green Server Pool: $GreenServerPool\"\r\n}\r\n\r\n##\r\n# Some LTM devices can be paired for failover.  Query a known device to\r\n# select the active device in the group.\r\n##\r\nfunction Get-ActiveLtmDevice($LtmIp, $Credential) {\r\n    $uri = \"https://$LtmIp/mgmt/tm/cm/device\"\r\n\r\n    Write-Host \"Requesting device config from $uri\"\r\n    $response = Invoke-RestMethod -Uri $uri -Credential $Credential -Method Get \r\n\r\n    $active = $null\r\n    foreach ($item in $response.Items) {\r\n        if ($item.failoverState -eq \"active\") {\r\n            $active = $item.name\r\n            Write-Host \"$active is an active node\"\r\n        }\r\n        else {\r\n            Write-Host $item.fullPath \" is not active\" \r\n        }\r\n    }\r\n    if ($active -eq $null) {\r\n        Write-Error \"No active device found.\"\r\n    }\r\n\r\n    return $active\r\n}\r\n\r\n##\r\n# Get the current virtual server pool name\r\n##\r\nfunction Get-CurrentPool($LtmIp, $VirtualServer, $Credential) {\r\n    $uri = \"https://$LtmIp/mgmt/tm/ltm/virtual/$VirtualServer\"\r\n    Write-Host \"Requesting current server pool from $uri\"\r\n    $response = Invoke-RestMethod -Uri $uri -Credential $Credential -Method Get \r\n\r\n    return $response.pool\r\n}\r\n\r\n##\r\n# Set a virtual server's pool name\r\n##\r\nfunction Set-ServerPool($LtmIp, $VirtualServer, $Pool, $Credential) {\r\n    $uri = \"https://$LtmIp/mgmt/tm/ltm/virtual/$VirtualServer\"\r\n    Write-Host \"Setting server pool $Pool at $uri\"\r\n\r\n    $request = @{\r\n        pool=\"$Pool\"\r\n    }\r\n\r\n\r\n    $body = $request | ConvertTo-Json\r\n    Invoke-RestMethod -Uri $uri -Credential $Credential -Method Patch -Body $body -ContentType 'application/json'\r\n}\r\n\r\n\r\n# Handle untrusted certs since we use self-signed certificates.\r\nadd-type @\"\r\n    using System.Net;\r\n    using System.Security.Cryptography.X509Certificates;\r\n    public class TrustAllCertsPolicy : ICertificatePolicy {\r\n        public bool CheckValidationResult(\r\n            ServicePoint srvPoint, X509Certificate certificate,\r\n            WebRequest request, int certificateProblem) {\r\n            return true;\r\n        }\r\n    }\r\n\"@\r\n[System.Net.ServicePointManager]::CertificatePolicy = New-Object TrustAllCertsPolicy\r\n\r\nPrint-DebugVariables $stepF5LtmBigIP $stepF5LtmUserName $stepF5LtmVirtualServer $stepF5LtmBlueServerPool $stepF5LtmGreenServerPool\r\n\r\n#create F5 Credentials\r\n$secpasswd = ConvertTo-SecureString $stepF5LtmUserPassword -AsPlainText -Force\r\n$cred = New-Object System.Management.Automation.PSCredential ($stepF5LtmUserName, $secpasswd)\r\n\r\n#select the active device\r\n$activeLtmBigIp = Get-ActiveLtmDevice -LtmIp $stepF5LtmBigIP -Credential $cred\r\n\r\n# Check the current server pool\r\n$currentPool = Get-CurrentPool -LtmIp $activeLtmBigIp -VirtualServer $stepF5LtmVirtualServer -Credential $cred\r\nWrite-Host \"The current pool is $currentPool\"\r\n\r\nIf($currentPool -Match $stepF5LtmBlueServerPool) {\r\n    Write-Host \"Blue server pool is active.  Switching to Green\"\r\n    Set-ServerPool -LtmIp $activeLtmBigIp -VirtualServer $stepF5LtmVirtualServer -Pool $stepF5LtmGreenServerPool -Credential $cred\r\n}\r\nElseIf($currentPool -Match $stepF5LtmGreenServerPool) {\r\n    Write-Host \"Green server pool is active.  Switching to Blue\"\r\n    Set-ServerPool -LtmIp $activeLtmBigIp -VirtualServer $stepF5LtmVirtualServer -Pool $stepF5LtmBlueServerPool -Credential $cred\r\n}\r\nElse {\r\n    Write-Error \"Current pool does not match the configured blue or green pool name.  No changes will be made\"\r\n}",
     "Octopus.Action.Script.ScriptFileName": null,
     "Octopus.Action.Package.FeedId": null,
     "Octopus.Action.Package.PackageId": null
@@ -16,9 +16,9 @@
   "Parameters": [
     {
       "Id": "eee59c9b-dbea-4941-8674-c542d4045704",
-      "Name": "F5LtmBigIP",
+      "Name": "stepF5LtmBigIP",
       "Label": "F5 LTM Big IP",
-      "HelpText": "The ip address of the F5 LTM BIG-IP device",
+      "HelpText": "The IP address of the F5 BIG-IP device",
       "DefaultValue": null,
       "DisplaySettings": {
         "Octopus.ControlType": "SingleLineText"
@@ -26,9 +26,9 @@
     },
     {
       "Id": "75bf98f8-f596-41e4-a957-b4ebbd336905",
-      "Name": "F5LtmUserName",
+      "Name": "stepF5LtmUserName",
       "Label": "F5 LTM User Name",
-      "HelpText": "The name of a F5 LTM user who has access to the API",
+      "HelpText": "The username of a F5 LTM user who has access to the API",
       "DefaultValue": null,
       "DisplaySettings": {
         "Octopus.ControlType": "SingleLineText"
@@ -36,9 +36,9 @@
     },
     {
       "Id": "b8fea18b-c08b-4a99-b017-903f676e8c33",
-      "Name": "F5LtmUserPassword",
+      "Name": "stepF5LtmUserPassword",
       "Label": "F5 LTM User Password",
-      "HelpText": "The password of a F5 LTM user who has access to the API",
+      "HelpText": "The password for the F5 LTM user who has access to the API",
       "DefaultValue": null,
       "DisplaySettings": {
         "Octopus.ControlType": "SingleLineText"
@@ -46,7 +46,7 @@
     },
     {
       "Id": "45e588ac-f1de-45d8-a1ec-535429efd1fe",
-      "Name": "F5LtmVirtualServer",
+      "Name": "stepF5LtmVirtualServer",
       "Label": "F5 LTM Virtual Server Name",
       "HelpText": "The name of the virtual server whose server pool we're going to toggle.",
       "DefaultValue": null,
@@ -56,7 +56,7 @@
     },
     {
       "Id": "db2d7298-6e5f-4ef9-9206-ed060c623b3e",
-      "Name": "F5LtmBlueServerPool",
+      "Name": "stepF5LtmBlueServerPool",
       "Label": "F5 LTM Blue Server Pool Name",
       "HelpText": "The name of the blue server pool on the load balancer",
       "DefaultValue": null,
@@ -66,7 +66,7 @@
     },
     {
       "Id": "65ba35f3-de3a-4e69-aed4-26b9c13fd50b",
-      "Name": "F5LtmGreenServerPool",
+      "Name": "stepF5LtmGreenServerPool",
       "Label": "F5 LTM Green Server Pool Name",
       "HelpText": "The name of the green server pool on the load balancer",
       "DefaultValue": null,
@@ -76,8 +76,8 @@
     }
   ],
   "$Meta": {
-    "ExportedAt": "2016-10-12T14:18:17.432Z",
-    "OctopusVersion": "3.4.7",
+    "ExportedAt": "2016-11-16T21:35:01.200Z",
+    "OctopusVersion": "3.4.14",
     "Type": "ActionTemplate"
   }
 }

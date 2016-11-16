@@ -67,14 +67,14 @@ add-type @"
 "@
 [System.Net.ServicePointManager]::CertificatePolicy = New-Object TrustAllCertsPolicy
 
-Print-DebugVariables $F5LtmBigIP $F5LtmUserName $F5LtmDeviceGroup
+Print-DebugVariables $stepF5LtmBigIP $stepF5LtmUserName $stepF5LtmDeviceGroup
 
 #create F5 Credentials
-$secpasswd = ConvertTo-SecureString $F5LtmUserPassword -AsPlainText -Force
-$cred = New-Object System.Management.Automation.PSCredential ($F5LtmUserName, $secpasswd)
+$secpasswd = ConvertTo-SecureString $stepF5LtmUserPassword -AsPlainText -Force
+$cred = New-Object System.Management.Automation.PSCredential ($stepF5LtmUserName, $secpasswd)
 
 #select the active device
-$activeLtmBigIp = Get-ActiveLtmDevice -LtmIp $F5LtmBigIP -Credential $cred
+$activeLtmBigIp = Get-ActiveLtmDevice -LtmIp $stepF5LtmBigIP -Credential $cred
 
 #sync the active device to the device group
-Sync-LtmGroup $activeLtmBigIp $F5LtmDeviceGroup $cred
+Sync-LtmGroup $activeLtmBigIp $stepF5LtmDeviceGroup $cred
