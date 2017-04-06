@@ -61,6 +61,110 @@ function Set-ServerPool($LtmIp, $VirtualServer, $Pool, $Credential) {
     Invoke-RestMethod -Uri $uri -Credential $Credential -Method Patch -Body $body -ContentType 'application/json'
 }
 
+##
+# Generate the name of a data group on the f5 based on the virtual server name.
+# The name of datagroups created by this script is in the form 'dg_<virtual server name'.
+##
+function Format-DataGroupName($VirtualServer) {
+    $dataGroupName = $VirtualServer -replace '/Common/',''
+    return "dg_$dataGroupName"
+}
+
+##
+# Retrieve a datagroup from the f5 device.
+##
+function Get-DataGroup($LtmIp, $DataGroupName, $Credential) {    
+    $uri = "https://$LtmIp/mgmt/tm/ltm/data-group/internal/$DataGroupName"
+    Write-Host "Getting data group $dataGroupName at $uri"
+  
+    try {
+        $response = Invoke-RestMethod -Uri $uri -Credential $Credential -Method Get
+    }
+    catch {
+        if ($_.Exception.Response.StatusCode.Value__ -eq 404) {
+            $response = $null
+        }
+        else {
+            throw $_.Exception
+        }
+    }
+    
+    return $response
+}
+
+##
+# Create a new data group on the f5 with the blue_green_pool information setup.
+##
+function Create-DataGroupPool($LtmIp, $DataGroupName, $ServerPool, $Credential) {
+     $uri = "https://$LtmIp/mgmt/tm/ltm/data-group/internal/"
+     Write-Host "Creating data group $dataGroupName at $uri"
+
+     $request = @{
+       name = $DataGroupName
+       type = "string"
+       records = @(Generate-DataGroupPoolRecord -ServerPool $ServerPool)
+    }
+
+    $body = $request | ConvertTo-Json
+    Invoke-RestMethod -Uri $uri -Credential $Credential -Method Post -Body $body -ContentType 'application/json'
+}
+
+##
+# Update the blue_green_pool record of the specified datagroup
+##
+function Update-DataGroupPool($LtmIp, $DataGroupName, $ServerPool, $DataGroup, $Credential) {
+     $uri = "https://$LtmIp/mgmt/tm/ltm/data-group/internal/$DataGroupName"
+     Write-Host "Updating data group $dataGroupName at $uri"
+
+     $records = $DataGroup.records
+     if ($records -eq $null) {
+         $records = @(Generate-DataGroupPoolRecord -ServerPool $ServerPool) 
+     }
+     else {
+        $poolRecord = $records | Where-Object -Property name -eq "blue_green_pool"
+        if ($poolRecord -eq $null) {
+            $records = $records += Generate-DataGroupPoolRecord -ServerPool $ServerPool
+        }
+        else {
+            $poolRecord.data = $ServerPool
+        }
+     }
+
+    $request = @{
+       records = $records
+    }
+
+    $body = $request | ConvertTo-Json
+    Invoke-RestMethod -Uri $uri -Credential $Credential -Method Patch -Body $body -ContentType 'application/json'
+}
+
+##
+# Create the structure for a data group's blue_green_pool record
+##
+function Generate-DataGroupPoolRecord($ServerPool) {
+    return @{
+                name = "blue_green_pool"
+                data = $ServerPool
+            }
+}
+
+##
+# Configure a data group with the blue_green_pool setting that is specified
+##
+function Config-DataGroupPool($LtmIp, $VirtualServer, $ServerPool, $Credential)
+{
+    $dataGroupName = $dataGroupName = Format-DataGroupName -VirtualServer $VirtualServer
+    $dg = Get-DataGroup -LtmIp $LtmIp -DataGroupName $dataGroupName -Credential $Credential
+
+    if ($dg -eq $null) {
+        Write-Host "$dataGroupName was not found.  Creating..."
+        Create-DataGroupPool -LtmIp $LtmIp -DataGroupName $dataGroupName -ServerPool $ServerPool -Credential $Credential
+    }
+    else {
+        write-host "$dataGroupName found.  Updating..."
+        Update-DataGroupPool -LtmIp $LtmIp -DataGroupName $dataGroupName -ServerPool $ServerPool -DataGroup $dg -Credential $Credential
+    }
+}
 
 # Handle untrusted certs since we use self-signed certificates.
 add-type @"
@@ -94,4 +198,5 @@ If($currentPool -Match $stepF5LtmNewServerPool) {
 }
 Else {
     Set-ServerPool -LtmIp $activeLtmBigIp -VirtualServer $stepF5LtmVirtualServer -Pool $stepF5LtmNewServerPool -Credential $cred
+    Config-DataGroupPool -LtmIp $activeLtmBigIp -VirtualServer $stepF5LtmVirtualServer -ServerPool $stepF5LtmNewServerPool -Credential $cred
 }
