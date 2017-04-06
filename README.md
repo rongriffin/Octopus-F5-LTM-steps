@@ -10,13 +10,13 @@ Check if the active server pool for a specified F5 LTM virtual server is Active.
 
 Set the server pool for a F5 LTM virtual server route traffic to a new set of servers.
 
-Updates a f5 data group (named "dg_$lt;virtual server name&gt;") with the name of the server pool used in record called "blue_green_pool".  This is useful to access this data real-time in iRules.
+Updates a f5 data group (named "dg_&lt;virtual server name&gt;") with the name of the server pool used in record called "blue_green_pool".  This is useful to access this data real-time in iRules.
 
 ##toggle_active_server_pool
 
 Make the non-active server pool active.
 
-Updates a f5 data group (named "dg_$lt;virtual server name&gt;") with the name of the server pool used in record called "blue_green_pool".  This is useful to access this data real-time in iRules.
+Updates a f5 data group (named "dg_&lt;virtual server name&gt;") with the name of the server pool used in record called "blue_green_pool".  This is useful to access this data real-time in iRules.
 
 ##sync_active_config
 
