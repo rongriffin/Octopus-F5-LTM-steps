@@ -1,0 +1,53 @@
+when RULE_INIT {
+ 
+	# Log debug messages to /var/log/ltm? 1=yes, 0=no
+	set static::sb_debug 1
+
+} 
+
+when CLIENT_ACCEPTED {
+	
+	# store the default server pool for the connection
+	set default_pool [string map -nocase {/Common/ ""} [LB::server pool]]	
+}
+
+ when HTTP_REQUEST {
+
+	# grab the current virtual server name with /Common/ removed
+	set virtual_server [string map -nocase {/Common/ ""} [virtual name]]
+	
+	# Naming convention is that the datagroup storing config
+	# is named dg_<virtual server name>
+	set data_group "dg_$virtual_server"
+	
+	# Make sure that the data group exists or the iRule will fail the request        
+	if  {[class exists $data_group]} {
+		set bg_pool [class match -value "blue_green_pool" equals $data_group]    
+		
+		# If there was a blue/green pool found, use it
+		if {[string length $bg_pool] > 0} {
+			
+			#track occurrences when the connection's default pool is different than the
+			#data group blue/green pool setting			
+			if {$default_pool != $bg_pool} { 
+				if {$static::sb_debug} {log local0.info "Connection switched from pool <$default_pool> to <$bg_pool>"}
+				# reset the default pool
+				set default_pool $bg_pool			
+			}
+
+			# route the request to the appropriate blue/green pool
+			pool $bg_pool
+		}
+		else {
+			# The data group did not have a blue_green_pool set, so use the default.
+			if {$static::sb_debug} { log local0.info "blue_green_pool setting not found in <$data_group>.  Using default pool <$default_pool>" }
+			pool $default_pool
+		}
+	}
+	else {   
+		#data_group didn't exist, so use the default pool
+		if {$static::sb_debug} { log local0.info "Data group <$data_group> not found.  Using default pool <$default_pool>" }
+		pool $default_pool
+	}
+
+}
