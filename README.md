@@ -6,11 +6,15 @@ Octopus steps useful for blue/green deployments managed by F5's Local Traffic Ma
 
 Check if the active server pool for a specified F5 LTM virtual server is Active.  If it is, throw an error to prevent deployment to a live site.
 
-## set_activate_server_pool
+## set_active_server_pool
 
 Set the server pool for a F5 LTM virtual server route traffic to a new set of servers.
 
 Updates a f5 data group (named dg_virtual server name) with the name of the server pool used in record called blue_green_pool.  This is useful to access this data real-time in iRules.
+
+## set_active_server_pool_stage
+
+Same as set_active_server_pool but with an extra parameter that specifies a server pool used for staging.
 
 ## toggle_active_server_pool
 
